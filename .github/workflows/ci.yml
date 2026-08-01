@@ -1,0 +1,77 @@
+name: CI
+
+# Windows only: the crate targets Windows and half of it is windows-sys calls,
+# so a Linux job would not compile, let alone say anything useful.
+on:
+  push:
+    branches: [main, "develop/**"]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  check:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Show toolchain
+        run: |
+          rustup show
+          cargo -V
+          cargo clippy -V
+
+      - uses: actions/cache@v6
+        with:
+          path: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: ${{ runner.os }}-cargo-
+
+      - name: Format
+        run: cargo fmt --check
+
+      # --locked here and below: without it cargo is free to re-resolve when Cargo.toml and
+      # Cargo.lock disagree, and CI would go green against a dependency set that is not the
+      # one committed. Nothing that runs here should be picking versions.
+      - name: Clippy
+        run: cargo clippy --locked --all-targets -- -D warnings
+
+      # The hardware tests are #[ignore]d, so this runs everything else: the frame decoder,
+      # the icon geometry, the notification decision, and the ones with side effects. Those
+      # write files under the temp directory and a `Run` value under HKCU, both under names
+      # carrying this process id, never the app's own.
+      - name: Test
+        run: cargo test --locked
+
+      # README shows the icons as PNGs, and `readme_icons` writes them from the drawing code
+      # itself. Regenerating and diffing is what stops a color or a radius change from
+      # shipping with pictures of the old one, which is the failure where every test passes
+      # and the documentation is the only thing lying. Two steps, because pwsh does not stop
+      # on the first command's failure. The encoder is hand-written and stamps no timestamp,
+      # so the bytes are the same every run.
+      - name: Regenerate the README icons
+        run: cargo test --locked -- --ignored readme_icons
+
+      - name: README icons match the drawing code
+        run: git diff --exit-code docs/icons
+
+      # README claims the binary is small, and the release profile is tuned for it.
+      # Building it here keeps that a measurement rather than a memory.
+      - name: Release build
+        run: cargo build --locked --release
+
+      - name: Binary size
+        shell: pwsh
+        run: ./.github/check-size.ps1

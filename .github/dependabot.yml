@@ -1,0 +1,23 @@
+version: 2
+
+# Weekly rather than daily: three direct dependencies do not move often enough to be worth
+# a notification a day. CI gates whatever comes through, since every cargo command is
+# --locked and the size script fails the job if a bump costs more than the ceiling allows.
+#
+# Read the serialport bumps rather than waving them through. This app must never call
+# `flush()` on the port, and the reason (its `write` is a bare WriteFile, so a flush pushes
+# nothing out, while `FlushFileBuffers` on a comm device can block past the write timeout)
+# is read off that crate's source rather than promised by its API. A release that buffers
+# writes would turn "do not flush" from harmless into wrong. CLAUDE.md carries the rule.
+updates:
+  - package-ecosystem: cargo
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 3
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 3

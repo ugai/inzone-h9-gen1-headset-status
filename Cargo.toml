@@ -1,0 +1,20 @@
+[package]
+name = "inzone-h9-gen1-headset-status"
+version = "0.1.0"
+edition = "2024"
+authors = ["ugai"]
+description = "Windows tray app that shows the power state of a Sony INZONE H9 / H7 (1st gen) headset"
+license = "0BSD"
+publish = false
+
+[profile.release]
+opt-level = "z"
+codegen-units = 1
+lto = true
+strip = true
+panic = "abort"
+
+[dependencies]
+serialport = "4.9.0"
+tray-icon = "0.24.1"
+windows-sys = { version = "0.61.2", features = ["Win32_UI_WindowsAndMessaging", "Win32_UI_HiDpi", "Win32_Foundation", "Win32_UI_Shell", "Win32_System_Console", "Win32_System_Threading", "Win32_Security", "Win32_Devices_DeviceAndDriverInstallation", "Win32_System_Registry", "Win32_Graphics_Gdi", "Win32_Globalization"] }

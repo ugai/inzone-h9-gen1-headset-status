@@ -1,0 +1,115 @@
+name: Release
+
+# Building currently needs a Rust toolchain, which is a high bar for a tray utility that
+# ships as one small executable. A version tag builds it here and attaches it instead.
+on:
+  push:
+    tags: ["v*"]
+  # So the workflow can be exercised without minting a tag. It builds and checks, and
+  # stops short of creating anything.
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Show toolchain
+        run: |
+          rustup show
+          cargo -V
+
+      # Deliberately no cache. A release is built rarely and has to be reproducible from
+      # the tag alone, so a stale target directory is not a risk worth taking to save a
+      # minute.
+      # --locked because a release has to be the dependency set that was committed. Without
+      # it a Cargo.toml the lock file does not match would be resolved here, and the exe
+      # people download would be built from versions nobody chose.
+      - name: Build
+        run: cargo build --locked --release
+
+      # The tag is what people will quote, and the tray menu shows CARGO_PKG_VERSION. If
+      # the two disagree, whichever one someone reads is wrong.
+      - name: Check the tag against Cargo.toml
+        if: startsWith(github.ref, 'refs/tags/')
+        shell: pwsh
+        # The ref arrives as an environment variable rather than through ${{ }}. A tag name
+        # may contain a semicolon, and expanding one into the script body would run it.
+        env:
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $tag = $env:REF_NAME
+          $line = Select-String -Path Cargo.toml -Pattern '^version\s*=\s*"([^"]+)"' | Select-Object -First 1
+          if (-not $line) { throw 'no version in Cargo.toml' }
+          $version = $line.Matches[0].Groups[1].Value
+          "tag $tag, Cargo.toml $version"
+          if ($tag -ne "v$version") { throw "tag $tag does not match Cargo.toml version $version" }
+
+      - name: Test
+        run: cargo test --locked
+
+      - name: Binary size
+        shell: pwsh
+        run: ./.github/check-size.ps1
+
+      - name: Stage the asset
+        shell: pwsh
+        env:
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          # The ref becomes part of a file name, and a branch name may contain a slash:
+          # `feature/foo` would name a directory that does not exist and fail the copy.
+          # `v0.1.0` and `v0.1.0-rc.1` come through whole, because a leading v, digits,
+          # dots and hyphens are all in the set kept below. A tag using anything else, such
+          # as semver build metadata (`v0.1.0+2026`), gets a dash where that character was.
+          # Only the file on disk differs: the release is still named by the tag, and the
+          # checksum beside it is written from the file.
+          $suffix = $env:REF_NAME -replace '[^A-Za-z0-9._-]', '-'
+          New-Item -ItemType Directory -Force dist | Out-Null
+          $asset = "dist/inzone-h9-gen1-headset-status-$suffix.exe"
+          Copy-Item target/release/inzone-h9-gen1-headset-status.exe $asset
+          # A single unsigned exe off the internet deserves something to check it against.
+          $hash = (Get-FileHash $asset -Algorithm SHA256).Hash.ToLower()
+          "$hash  $(Split-Path -Leaf $asset)" | Set-Content -NoNewline "$asset.sha256"
+          "$hash  $asset"
+          Add-Content -Path $env:GITHUB_ENV -Value "asset=$asset"
+
+      # Created as a draft: pushing a tag says "build this", and publishing is a separate
+      # decision. Review the notes and press the button, or drop --draft here to skip that.
+      #
+      # Keyed on the event, not on the ref. The only push this workflow answers is a v* tag,
+      # so `push` means a tag; `startsWith(github.ref, 'refs/tags/')` was also true of a
+      # manual run launched from a tag, which would have minted a release from a button the
+      # comment at the top of this file promises creates nothing.
+      - name: Draft the release
+        if: github.event_name == 'push'
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          gh release create "${env:REF_NAME}" `
+            "${env:asset}" "${env:asset}.sha256" `
+            --draft `
+            --generate-notes `
+            --title "${env:REF_NAME}"
+
+      # workflow_dispatch has no release to attach to, so the build is still inspectable.
+      # The condition mirrors the one above: between them every run produces exactly one of
+      # the two, including a manual run launched from a tag.
+      - name: Upload the build instead
+        if: github.event_name != 'push'
+        uses: actions/upload-artifact@v4
+        with:
+          name: inzone-h9-gen1-headset-status
+          path: dist/
