@@ -177,7 +177,7 @@ jobs:
       # the two, including a manual run launched from a tag.
       - name: Upload the build instead
         if: github.event_name != 'push'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: inzone-h9-gen1-headset-status
           path: dist/
