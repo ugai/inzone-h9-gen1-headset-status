@@ -114,11 +114,19 @@ jobs:
           }
           $nsis = Find-MakeNSIS
           if (-not $nsis) {
+            # Belt and braces against a future default. Today a native command's exit code
+            # does not raise under `Stop` (measured, pwsh 7.6.3), and the line below is what
+            # the outcome is read from.
+            $PSNativeCommandUseErrorActionPreference = $false
             choco install nsis --no-progress --yes
-            if ($LASTEXITCODE -ne 0) { throw "choco install nsis failed with $LASTEXITCODE" }
+            $code = $LASTEXITCODE
             $nsis = Find-MakeNSIS
+            # On what is there, not on what was returned. Chocolatey passes an installer's
+            # exit code through, and 3010 and 1641 both mean it worked and would like a
+            # reboot; failing on those would stop a release over an installer that is sitting
+            # right there. The code is worth quoting only when there is nothing to run.
+            if (-not $nsis) { throw "NSIS did not install: no makensis, and choco exited with $code" }
           }
-          if (-not $nsis) { throw 'makensis is still not there after installing NSIS' }
           "makensis: $nsis"
           # From Cargo.toml, not from the tag: this step also runs on workflow_dispatch,
           # where the ref is a branch name and would end up in the Programs list.
