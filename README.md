@@ -21,7 +21,7 @@ Run it with `--help`.
 
 ## Installing
 
-Download the exe from [Releases](https://github.com/ugai/inzone-h9-gen1-headset-status/releases) and put it wherever you like. There is no installer.
+Download the exe from [Releases](https://github.com/ugai/inzone-h9-gen1-headset-status/releases) and put it wherever you like. There is also an installer (`-setup.exe`), which installs for the current user and keeps the startup setting working across upgrades.
 
 You can check the hash of a downloaded exe:
 

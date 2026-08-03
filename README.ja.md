@@ -21,7 +21,7 @@ INZONE H9 II には非対応で、対応の予定もありません。H9 II の�
 
 ## インストール
 
-[Releases](https://github.com/ugai/inzone-h9-gen1-headset-status/releases) から exe をダウンロードして、好きな場所に置いてください。インストーラーは提供していません。
+[Releases](https://github.com/ugai/inzone-h9-gen1-headset-status/releases) から exe をダウンロードして、好きな場所に置いてください。インストーラー（`-setup.exe`）も用意しています。ユーザー単位でインストールし、更新しても自動起動の設定が維持されます。
 
 ダウンロードした exe については、下記のコマンドでハッシュを確認できます。
 

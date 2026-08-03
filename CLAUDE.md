@@ -52,6 +52,39 @@ decisions). `icon` draws it, `notify` sends it through the tray icon.
 `startup` the HKCU `Run` entry, `cli` the argument handling and the print-from-a-GUI-process
 trick. `main` is the single-instance claim, the poller thread and the message loop.
 
+## The installer
+
+`packaging/installer.nsi` builds a per-user installer beside the portable exe, because the
+`Run` entry holds a full path and the released file name carries its version, so that path
+stops naming anything the moment the next version lands. The portable exe stays the main way
+to run this and nothing here is required.
+
+**No "start with Windows" checkbox in the installer.** The tray menu owns that switch and
+says so when the registry refuses it. A checkbox in an installer re-asserts itself at every
+upgrade, so somebody who turned startup off would find it back on after an update they ran
+for an unrelated reason.
+
+**The uninstaller deletes the `Run` value only when it names the exe inside `$INSTDIR`.** A
+portable copy writes the same value under the same name, and removing the installed copy must
+not stop that one from starting. Deleting it unconditionally is the tempting simplification.
+Not deleting it at all is worse still: it would leave an entry naming an exe that no longer
+exists, which is the failure this installer was written for.
+
+**Find a running instance through the mutex, never by process name.** A running exe cannot be
+replaced or deleted, so both halves stop before touching anything. The name is the thing that
+moves (`...-v0.1.0.exe` downloaded, `...exe` once installed), so a name match finds one and
+misses the other. `OpenMutexW` on `Local\inzone-h9-gen1-headset-status` finds it either way.
+Measured with the app running, with it stopped, and against a name that exists nowhere.
+
+**The `.nsi` needs a UTF-8 BOM.** Without one NSIS reads it as the system code page and dies
+on the Japanese strings with `Bad text encoding`. `Unicode true` is about the installer being
+built, not about the source being read.
+
+**An uninstaller's exit code says nothing.** NSIS copies it to `%TEMP%` and re-runs it there,
+so the process you waited on returns 0 whether or not anything happened. Pass `_?=$INSTDIR`
+to keep it in place and synchronous, which is the only way to test it; that form then cannot
+delete itself, so the leftover `uninstall.exe` is expected rather than a bug.
+
 ## Running the tests
 
 ```bash
