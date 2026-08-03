@@ -83,31 +83,69 @@ jobs:
           Copy-Item target/release/inzone-h9-gen1-headset-status.exe $asset
           Add-Content -Path $env:GITHUB_ENV -Value "asset=$asset"
 
-      # NSIS is on the runner image, so this needs no setup step of its own. The full path
-      # rather than the bare name: PATH is the image's business and this is not worth being
-      # at the mercy of.
-      #
       # The installer is not the main way to get this app, and the portable exe above stays.
       # It exists because the startup entry holds a full path, and a versioned file name
       # moves that path at every release. See packaging/installer.nsi.
+      #
+      # NSIS is not on the `windows-latest` image. It is on `windows-2022`, and this step
+      # first shipped having read that image's list by mistake, so the run died on a missing
+      # makensis before it could produce anything. Installing costs about half a minute on a
+      # workflow that runs a few times a year, which is cheaper than pinning an image that
+      # will be retired, or than replacing an installer already tested on real hardware.
+      #
+      # Through chocolatey, which is on the image, rather than by fetching a package manager
+      # first: this job signs what it builds, and a release pipeline is the last place to add
+      # a script downloaded at run time.
+      #
+      # Looked for before installing and again afterwards. The shim does not reach this
+      # session's PATH, and an image that gains NSIS later should not send us off to install
+      # it again.
       - name: Build the installer
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          $nsis = "${env:ProgramFiles(x86)}\NSIS\makensis.exe"
-          if (-not (Test-Path $nsis)) { throw "makensis not found at $nsis" }
+          function Find-MakeNSIS {
+            $cmd = Get-Command makensis -ErrorAction SilentlyContinue
+            if ($cmd) { return $cmd.Source }
+            foreach ($p in "${env:ProgramFiles(x86)}\NSIS\makensis.exe", "$env:ProgramFiles\NSIS\makensis.exe") {
+              if (Test-Path $p) { return $p }
+            }
+            return $null
+          }
+          $nsis = Find-MakeNSIS
+          if (-not $nsis) {
+            # Belt and braces against a future default. Today a native command's exit code
+            # does not raise under `Stop` (measured, pwsh 7.6.3), and the line below is what
+            # the outcome is read from.
+            $PSNativeCommandUseErrorActionPreference = $false
+            choco install nsis --no-progress --yes
+            $code = $LASTEXITCODE
+            $nsis = Find-MakeNSIS
+            # On what is there, not on what was returned. Chocolatey passes an installer's
+            # exit code through, and 3010 and 1641 both mean it worked and would like a
+            # reboot; failing on those would stop a release over an installer that is sitting
+            # right there. The code is worth quoting only when there is nothing to run.
+            if (-not $nsis) { throw "NSIS did not install: no makensis, and choco exited with $code" }
+          }
+          "makensis: $nsis"
           # From Cargo.toml, not from the tag: this step also runs on workflow_dispatch,
           # where the ref is a branch name and would end up in the Programs list.
           $line = Select-String -Path Cargo.toml -Pattern '^version\s*=\s*"([^"]+)"' | Select-Object -First 1
           if (-not $line) { throw 'no version in Cargo.toml' }
           $version = $line.Matches[0].Groups[1].Value
+          # What Windows shows on the file's Properties tab has to be four numbers and
+          # nothing else, so a version like `0.1.0-rc.1` cannot go in as it stands. The
+          # release keeps the whole string; only this one field gets the numeric part.
+          if ($version -notmatch '^(\d+)\.(\d+)\.(\d+)') { throw "cannot read a numeric version out of $version" }
+          $product = "$($Matches[1]).$($Matches[2]).$($Matches[3]).0"
           $setup = $env:asset -replace '\.exe$', '-setup.exe'
           # Absolute, both of them. NSIS resolves a relative path against its own working
           # directory rather than against the script, and getting that wrong writes the
           # installer somewhere nothing looks for it.
           $source = (Resolve-Path target/release/inzone-h9-gen1-headset-status.exe).Path
           $out = Join-Path (Get-Location).Path $setup
-          & $nsis -V2 "-DVERSION=$version" "-DSOURCE_EXE=$source" "-DOUT_FILE=$out" packaging/installer.nsi
+          & $nsis -V2 "-DVERSION=$version" "-DPRODUCT_VERSION=$product" `
+            "-DSOURCE_EXE=$source" "-DOUT_FILE=$out" packaging/installer.nsi
           if ($LASTEXITCODE -ne 0) { throw "makensis failed with $LASTEXITCODE" }
           "$((Get-Item $setup).Length) bytes  $setup"
           Add-Content -Path $env:GITHUB_ENV -Value "setup=$setup"
