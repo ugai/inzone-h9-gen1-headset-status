@@ -21,7 +21,7 @@ Run it with `--help`.
 
 ## Installing
 
-Download the exe from [Releases](https://github.com/ugai/inzone-h9-gen1-headset-status/releases) and put it wherever you like. There is no installer.
+Download the exe from [Releases](https://github.com/ugai/inzone-h9-gen1-headset-status/releases) and put it wherever you like. There is also an installer (`-setup.exe`), which installs for the current user and keeps the startup setting working across upgrades.
 
 You can check the hash of a downloaded exe:
 
@@ -29,7 +29,7 @@ You can check the hash of a downloaded exe:
 Get-FileHash .\inzone-h9-gen1-headset-status-*.exe -Algorithm SHA256
 ```
 
-An intact download matches the value in the `.sha256` file attached to the release.
+An intact download matches the value in the `.sha256` file of the same name in the release. Both the exe and the installer have one.
 
 That says the file arrived whole, not where it came from. For the second, releases carry a build attestation, which [GitHub CLI](https://cli.github.com/) checks against the workflow that produced them:
 
