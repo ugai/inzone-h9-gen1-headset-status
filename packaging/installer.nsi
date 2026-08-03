@@ -18,6 +18,11 @@ Unicode true
 !ifndef VERSION
   !define VERSION "0.0.0"
 !endif
+; Four numbers and nothing else, which is what the version resource will take. The workflow
+; derives it, because `0.1.0-rc.1` is a version Cargo is happy with and this field is not.
+!ifndef PRODUCT_VERSION
+  !define PRODUCT_VERSION "0.0.0.0"
+!endif
 !ifndef SOURCE_EXE
   !define SOURCE_EXE "..\target\release\inzone-h9-gen1-headset-status.exe"
 !endif
@@ -42,6 +47,16 @@ InstallDir "$LOCALAPPDATA\Programs\${APP}"
 ; An upgrade goes back where the last one went, including a directory the user chose.
 InstallDirRegKey HKCU "${UNINST_KEY}" "InstallLocation"
 SetCompressor /SOLID lzma
+
+; So the Properties tab of the downloaded setup.exe says which version it is. Without this
+; the only way to tell two of them apart is the file name, which is the problem this whole
+; file exists to solve.
+VIProductVersion "${PRODUCT_VERSION}"
+VIAddVersionKey "ProductName" "${APP}"
+VIAddVersionKey "ProductVersion" "${VERSION}"
+VIAddVersionKey "FileVersion" "${PRODUCT_VERSION}"
+VIAddVersionKey "FileDescription" "${APP} installer"
+VIAddVersionKey "LegalCopyright" ""
 
 !define MUI_ABORTWARNING
 !define MUI_FINISHPAGE_RUN "$INSTDIR\${EXE}"
@@ -105,6 +120,7 @@ Section "Install"
   WriteRegStr HKCU "${UNINST_KEY}" "Publisher" "ugai"
   WriteRegStr HKCU "${UNINST_KEY}" "InstallLocation" "$INSTDIR"
   WriteRegStr HKCU "${UNINST_KEY}" "DisplayIcon" "$INSTDIR\${EXE}"
+  WriteRegStr HKCU "${UNINST_KEY}" "URLInfoAbout" "https://github.com/ugai/${APP}"
   WriteRegStr HKCU "${UNINST_KEY}" "UninstallString" '"$INSTDIR\uninstall.exe"'
   WriteRegStr HKCU "${UNINST_KEY}" "QuietUninstallString" '"$INSTDIR\uninstall.exe" /S'
   WriteRegDWORD HKCU "${UNINST_KEY}" "NoModify" 1
