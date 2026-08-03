@@ -81,10 +81,6 @@ jobs:
           New-Item -ItemType Directory -Force dist | Out-Null
           $asset = "dist/inzone-h9-gen1-headset-status-$suffix.exe"
           Copy-Item target/release/inzone-h9-gen1-headset-status.exe $asset
-          # A single unsigned exe off the internet deserves something to check it against.
-          $hash = (Get-FileHash $asset -Algorithm SHA256).Hash.ToLower()
-          "$hash  $(Split-Path -Leaf $asset)" | Set-Content -NoNewline "$asset.sha256"
-          "$hash  $asset"
           Add-Content -Path $env:GITHUB_ENV -Value "asset=$asset"
 
       # NSIS is on the runner image, so this needs no setup step of its own. The full path
@@ -115,6 +111,21 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "makensis failed with $LASTEXITCODE" }
           "$((Get-Item $setup).Length) bytes  $setup"
           Add-Content -Path $env:GITHUB_ENV -Value "setup=$setup"
+
+      # Both files, in one place. An unsigned exe off the internet deserves something to
+      # check it against, and the installer is the one most people will actually run. Writing
+      # the two sidecars in the steps that produce each file would be the obvious shape, and
+      # it is how the algorithm in one of them drifts away from the other.
+      - name: Checksum the assets
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          foreach ($file in $env:asset, $env:setup) {
+            $hash = (Get-FileHash $file -Algorithm SHA256).Hash.ToLower()
+            # The bare file name, not the path: it is what the reader has on disk.
+            "$hash  $(Split-Path -Leaf $file)" | Set-Content -NoNewline "$file.sha256"
+            "$hash  $file"
+          }
 
       # Says that this exact file came out of this workflow, at this commit. The checksum
       # beside the asset only proves the download is intact; this is what a stranger can
@@ -155,7 +166,8 @@ jobs:
         run: |
           $ErrorActionPreference = 'Stop'
           gh release create "${env:REF_NAME}" `
-            "${env:asset}" "${env:asset}.sha256" "${env:setup}" `
+            "${env:asset}" "${env:asset}.sha256" `
+            "${env:setup}" "${env:setup}.sha256" `
             --draft `
             --generate-notes `
             --title "${env:REF_NAME}"
