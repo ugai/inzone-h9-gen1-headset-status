@@ -31,6 +31,12 @@ Get-FileHash .\inzone-h9-gen1-headset-status-*.exe -Algorithm SHA256
 
 リリースに添付している `.sha256` ファイルの値と一致すれば、ダウンロードは壊れていません。
 
+これで分かるのはファイルが欠けていないことだけで、どこから来たかは分かりません。そちらはリリースに添付しているビルド証明で確認でき、[GitHub CLI](https://cli.github.com/) がビルドしたワークフローと照合します。
+
+```powershell
+gh attestation verify .\inzone-h9-gen1-headset-status-<version>.exe -R ugai/inzone-h9-gen1-headset-status
+```
+
 exe には署名を付けていないので、初回の起動で「Windows によって PC が保護されました」という警告が出ます。実行する場合は「詳細情報」をクリックして「実行」を押してください。
 
 ## アンインストール

@@ -11,6 +11,10 @@ on:
 
 permissions:
   contents: write
+  # For the attestation below. `id-token` is what signs it, `attestations` is what
+  # records it against the repository.
+  id-token: write
+  attestations: write
 
 env:
   CARGO_TERM_COLOR: always
@@ -82,6 +86,25 @@ jobs:
           "$hash  $(Split-Path -Leaf $asset)" | Set-Content -NoNewline "$asset.sha256"
           "$hash  $asset"
           Add-Content -Path $env:GITHUB_ENV -Value "asset=$asset"
+
+      # Says that this exact file came out of this workflow, at this commit. The checksum
+      # beside the asset only proves the download is intact; this is what a stranger can
+      # check the origin against, with:
+      #
+      #   gh attestation verify inzone-h9-gen1-headset-status-<version>.exe -R ugai/inzone-h9-gen1-headset-status
+      #
+      # Before the release, so a signature that could not be recorded stops the run while
+      # there is still nothing published. Keyed on the event for the same reason the draft
+      # below is: an attestation is a record against the repository, and a manual run
+      # promises to create nothing.
+      #
+      # Free on public repositories, on every plan. On a private or internal one it needs
+      # GitHub Enterprise Cloud, and this step is where a private repository fails.
+      - name: Attest the build
+        if: github.event_name == 'push'
+        uses: actions/attest-build-provenance@v4
+        with:
+          subject-path: ${{ env.asset }}
 
       # Created as a draft: pushing a tag says "build this", and publishing is a separate
       # decision. Review the notes and press the button, or drop --draft here to skip that.

@@ -31,6 +31,12 @@ Get-FileHash .\inzone-h9-gen1-headset-status-*.exe -Algorithm SHA256
 
 An intact download matches the value in the `.sha256` file attached to the release.
 
+That says the file arrived whole, not where it came from. For the second, releases carry a build attestation, which [GitHub CLI](https://cli.github.com/) checks against the workflow that produced them:
+
+```powershell
+gh attestation verify .\inzone-h9-gen1-headset-status-<version>.exe -R ugai/inzone-h9-gen1-headset-status
+```
+
 The exe is not signed, so the first launch raises a SmartScreen warning saying Windows protected your PC. Click **More info** and then **Run anyway** to start it.
 
 ## Uninstalling
