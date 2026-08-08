@@ -11,6 +11,8 @@ The official companion app, INZONE Hub, knows, but you have to open its window t
 
 This utility reads the same state from the receiver and shows it as a colored tray icon.
 
+![Tray icon and menu](docs/screenshots/tray-en.avif)
+
 ## Unsupported models
 
 The INZONE H9 II is not supported, and there is no plan to support it. Its transceiver is not detected, and the tray stays in the no-receiver state.
