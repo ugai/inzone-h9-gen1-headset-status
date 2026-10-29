@@ -127,7 +127,7 @@ fn read_value(value_name: &str) -> Option<Vec<u16>> {
     // back with the type or the length it has now rather than the one we allocated for.
     (err == ERROR_SUCCESS && kind == REG_SZ && size as usize <= buf.len() && size.is_multiple_of(2)).then(|| {
         buf.truncate(size as usize);
-        buf.chunks_exact(2).map(|c| u16::from_le_bytes([c[0], c[1]])).collect()
+        buf.as_chunks::<2>().0.iter().map(|c| u16::from_le_bytes(*c)).collect()
     })
 }
 
